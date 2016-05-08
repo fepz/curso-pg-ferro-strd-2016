@@ -6,7 +6,10 @@ def create_graph_from_rts(rts):
     graph = nx.DiGraph()
 
     for task in rts:
-        graph.add_node(int(task["id"]), cpu="cpu "+ str(task["cpu"]) if "cpu" in task else "")
+        if "cpu" in task:
+            graph.add_node(int(task["id"]), cpu=task["cpu"])
+        else:
+            graph.add_node(int(task["id"]))
 
     for task in rts:
         if task["p"]:
