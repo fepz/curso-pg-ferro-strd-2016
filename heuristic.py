@@ -452,9 +452,10 @@ def main():
             6: {"capacity": 12000, "tasks": [], "id":6},
             7: {"capacity": 10000, "tasks": [], "id":7}}
 
+    # print cpu info
     print(tabulate([(k, v["capacity"]) for k,v in cpus.items()], ["cpu", "memory"], "psql"))
 
-
+    # run the heuristic method
     heuristic(rts, cpus)
 
 
