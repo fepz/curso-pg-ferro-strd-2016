@@ -4,8 +4,6 @@ Implements the algorithm discussed at "An Evolutionary Method to Solve the Real-
 
 import os
 import sys
-import networkx as nx
-import matplotlib.pyplot as plt
 import random
 from deap import tools
 from argparse import ArgumentParser
