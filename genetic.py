@@ -233,7 +233,7 @@ def genetic(rts, cpus):
         if valid_cpu:
             print_results(rts, chromosome[1])
         else:
-            print("  Invalid assignation found.")
+            print(" -- Invalid assignation found.")
 
     # bandwidth constraint
     bw_ok = B <= WDmin

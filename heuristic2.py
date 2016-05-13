@@ -49,7 +49,7 @@ def heuristic(rts, cpus):
                 return workload + (t - min_last_i)
             return workload + add_c
 
-        d = task["d"]  # deadline
+        d = task["new_d"] if "new_d" in task else task["d"]  # deadline
         c = task["c"]  # period
         n = d - get_empty_slots(d, tasks)  # slots left empty in [0, d]
 
@@ -91,6 +91,7 @@ def heuristic(rts, cpus):
         from the communicationstack. Each time a task is allocated to this processor the top-down polling of the whole
         communication-stack is repeated and candidate companion tasks tested in the same way, until allocating all
         candidates or until finding that no further tasks can be allocated to this processor. """
+
         for cpu in cpu_stack:
             while True:
                 pair = None
@@ -154,7 +155,7 @@ def heuristic(rts, cpus):
         until finding one to which it can be allocated. If no allocation is possible, Step 9 follows, else the task is
         deleted from the stack and Step 6 follows. """
 
-        alloc_cnt = 0
+        alloc_cnt = 0  # task allocations counter
 
         while True:
             alloc_cpu = None
@@ -251,33 +252,49 @@ def heuristic(rts, cpus):
     def step8(cpu_stack, comm_stack, task_graph):
         """ The schedulability of each processor containing sending tasks is reverified with deadlines corrected
         according to the precedence constraints """
+
+        def update_deadline(graph, node):
+            for cpu in cpu_stack:
+                for task in cpu["tasks"]:
+                    if task["id"] == node and "new_d" not in task:
+                        new_d = []
+                        for successor in task_graph.successors(task["id"]):
+                            other_cpu = 0
+                            if successor not in [t["id"] for t in cpu["tasks"]]:
+                                for cpu2 in cpu_stack:
+                                    if successor in [t["id"] for t in cpu2["tasks"]]:
+                                        task_list = cpu2["tasks"]
+                                        other_cpu = 1
+                            else:
+                                task_list = cpu["tasks"]
+
+                            for succ_task in task_list:
+                                if succ_task["id"] == successor:
+                                    successor_task = succ_task
+
+                            task_list.sort(key=lambda t: (t["t"], t["id"]))  # sort by period (RM) -- lesser id max prio
+
+                            l_s = last_starting_time(successor_task, task_list[:task_list.index(successor_task)])
+                            new_d.append(l_s - 1 - (other_cpu * delta))
+
+                        if new_d:
+                            task["new_d"] = min(new_d)
+
+        def recursive(graph, node):
+            predecessors = graph.predecessors(node)
+            if predecessors:
+                for predecessor in predecessors:
+                    update_deadline(graph, predecessor)
+                    recursive(graph, predecessor)
+
         delta = 1
-        for cpu in cpu_stack:
-            for task in cpu["tasks"]:
-                new_d = []
-                if task["id"] in task_graph.nodes():
-                    for successor in task_graph.successors(task["id"]):
-                        other_cpu = 0
-                        if successor not in [t["id"] for t in cpu["tasks"]]:
-                            for cpu2 in cpu_stack:
-                                if successor in [t["id"] for t in cpu2["tasks"]]:
-                                    task_list = cpu2["tasks"]
-                                    other_cpu = 1
-                        else:
-                            task_list = cpu["tasks"]
 
-                        for succ_task in task_list:
-                            if succ_task["id"] == successor:
-                                successor_task = succ_task
+        # for each leaf node in the graph, start the deadline verification
+        for node in task_graph.nodes():
+            if not task_graph.neighbors(node):
+                recursive(task_graph, node)
 
-                        task_list.sort(key=lambda t: (t["t"], t["id"]))  # sort by period (RM) -- lesser id max prio
-
-                        l_s = last_starting_time(successor_task, task_list[:task_list.index(successor_task)])
-                        new_d.append(l_s - 1 - (other_cpu * delta))
-
-                    if new_d:
-                        task["new_d"] = min(new_d)
-
+        # check that each cpu is schedulable and the memory constraints are held
         for cpu, cpu_data in cpus.items():
             if not allocation_test(cpu_data["capacity"], cpu_data["tasks"]):
                 return False
@@ -302,15 +319,14 @@ def heuristic(rts, cpus):
     # Perfoem allocability test on all pre-allocated tasks.
     for cpu, cpu_data in cpus.items():
         if not allocation_test(cpu_data["capacity"], cpu_data["tasks"]):
-            print("Tasks assigned to cpu {0} are not schedulable --- the system is absolutely non-schedulable.".format(cpu))
+            print("Tasks assigned to cpu {0} are not schedulable -- system absolutely non-schedulable.".format(cpu))
             sys.exit(1)
     print("Preallocated tasks are schedulable.")
 
     precedences = get_precedences_list(rts)
 
-    perm_cnt = 0
-    tentative_cnt = 0
-    valid_cnt = 0
+    perm_cnt = 0  # permutation counter
+    valid_cnt = 0  # valid solutions found counter (includes duplicates)
 
     cpu_keys = list(cpus.keys())
     random.shuffle(cpu_keys)
@@ -320,7 +336,7 @@ def heuristic(rts, cpus):
         # The permutation generated by itertools is a tuple -- make it a list
         cpu_stack = [cpus[x] for x in cpu_stack_perm_t]
 
-        # The task-stack is ordered by decreasing task utilization factors -- do not include preallocated tasks
+        # The task-stack is ordered by decreasing task utilization factors
         task_stack.sort(key=lambda task: task["uf"], reverse=True)
 
         # The communication-stack is assembled by ordering the communicating pairs by monotonic decreasing times of communication.
@@ -330,7 +346,7 @@ def heuristic(rts, cpus):
         # Perform the Step 4 of the heuristic.
         cpu_stack, comm_stack, task_stack = step4(cpu_stack, comm_stack, task_stack)
 
-        alloc_cnt = 0
+        alloc_cnt = 0  # number of allocations performed
 
         while task_stack:
             # Now only a subset of free (non allocated) tasks remains, and the cpu-stack is reordered by increasing processor
@@ -342,12 +358,12 @@ def heuristic(rts, cpus):
             # Perform Step 6
             alloc_cnt, cpu_stack, comm_stack, task_stack = step6(cpu_stack, comm_stack, task_stack)
 
-            # No allocations are possible
+            # No allocations were made -- break
             if alloc_cnt == 0:
                 break
 
         if alloc_cnt > 0:
-            # A tentative solution has been found -- now is tested for precedence constraints
+            # Test the precedence constraints of the tentative solution found
             task_graph = nx.DiGraph()
             task_graph.add_weighted_edges_from(precedences, weight='payload')
 
@@ -357,26 +373,30 @@ def heuristic(rts, cpus):
             if valid_solution:
                 valid_cnt += 1
 
-                # create a list of task tuples
-                r1 = [tuple([t for t in cpus[k]["tasks"]]) for k in sorted(list(cpus.keys()))]
+                # create a list of task tuples: [(t1, t2, t3, ...), (t4, t5, ....), ... ]
+                valid_result = []
+                for cpu, cpu_data in sorted(list(cpus.items()), key=lambda c: c[0]):
+                    cpu_data["tasks"].sort(key=lambda t: t["id"])
+                    valid_result.append(cpu_data["tasks"])
 
                 if len(results) == 0:
-                    results.append(r1)
+                    results.append(valid_result)
                 else:
                     count = 0
-                    for r in results:
+                    for unique_result in results:
                         repeat = 0
-                        for x in r1:
-                            if x in r:
+                        for x in valid_result:
+                            if x in unique_result:
                                 repeat += 1
-                        if repeat < len(r):
+                        if repeat < len(unique_result):
                             count += 1
                     if count == len(results):
-                        results.append(r1)
+                        results.append(valid_result)
 
+        # We are done with this permutation
         perm_cnt += 1
 
-        # Clear assignation
+        # Clear task allocations
         for cpu, cpu_val in cpus.items():
             cpu_val["tasks"] = []
 
@@ -394,13 +414,6 @@ def heuristic(rts, cpus):
 
     print("{0} permutations tested.".format(perm_cnt))
     print("{0} valid solutions found.".format(valid_cnt))
-
-    # for idx, result in enumerate(results):
-    #     print("Result", idx)
-    #     for cpu_idx, cpu in enumerate(result):
-    #         print("cpu {0}: ".format(cpu_idx), sorted([task["id"] for task in cpu]))
-    #         for task in sorted(cpu, key=lambda t: t["id"]):
-    #             print(task["id"], ": ", task["d"], task["new_d"] if "new_d" in task else " - ")
 
     # print tasks allocations
     for idx, result in enumerate(results):
@@ -433,13 +446,15 @@ def get_args():
 def main():
     args = get_args()
 
+    # Verify that the file exists
     if not os.path.isfile(args.xmlfile):
-        print("Can't find {0} XML file.".format(args.xmlfile))
+        print("{0}: file not found.".format(args.xmlfile))
         sys.exit(1)
 
     rts = get_rts_from_xmlfile(args.xmlid, args.xmlfile)
     #rts, _ = get_rts_from_pot_file("graph1.dot")
 
+    # complete uf and deadline values if no present
     for task in rts:
         if "uf" not in task:
             task["uf"] = task["c"] / task["t"]
