@@ -20,7 +20,7 @@ def heuristic(rts, cpus):
     def last_starting_time(task, tasks):
         """ Calculate the last possible starting time for executing task """
         def get_workload(t, tasks):
-            """ Calculate the worload required for tasks in [0,t] -- uses floor() """
+            """ Calculate the workload required for tasks in [0,t] -- uses floor() """
             workload = 0
             for task in tasks:
                 workload += (task["c"] * math.ceil(t / task["t"]))
