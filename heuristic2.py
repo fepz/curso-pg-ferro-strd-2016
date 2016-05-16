@@ -458,6 +458,9 @@ def main():
     for task in rts:
         if "uf" not in task:
             task["uf"] = task["c"] / task["t"]
+        else:
+            if task["uf"] == 0:
+                task["uf"] = task["c"] / task["t"]
         if "d" not in task:
             task["d"] = task["t"]
 
