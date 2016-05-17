@@ -254,7 +254,7 @@ def main():
         if "d" not in task:
             task["d"] = task["t"]
 
-    cpus = {0: {"capacity": 300, "tasks": []},
+    cpus0 = {0: {"capacity": 300, "tasks": []},
             1: {"capacity": 1400, "tasks": []},
             2: {"capacity": 320, "tasks": []},
             3: {"capacity": 730, "tasks": []},
@@ -270,8 +270,10 @@ def main():
             6: {"capacity": 12000, "tasks": [], "id":6},
             7: {"capacity": 10000, "tasks": [], "id":7}}
 
-    cpusz = {0: {"capacity": 15, "tasks": [], "id": 0},
+    cpus2 = {0: {"capacity": 15, "tasks": [], "id": 0},
             1: {"capacity": 15, "tasks": [], "id": 1}}
+
+    cpus = cpus2
 
     genetic(rts, cpus)
 
