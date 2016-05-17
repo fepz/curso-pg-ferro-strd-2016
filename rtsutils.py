@@ -78,3 +78,15 @@ def last_starting_time(task, tasks):
         t = t_tmp
 
     return t
+
+
+def communication_delay(rts, payload_bandwidth):
+    """ Calculates communication delay for a FRR schedulable network. """
+    delay = 0
+    for task in rts:
+        if "p" in task:
+            payload_sum = 0
+            for p in task["p"]:
+                payload_sum += p["payload"]
+            delay += (payload_sum / payload_bandwidth)
+    return delay
