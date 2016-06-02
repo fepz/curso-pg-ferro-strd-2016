@@ -4,12 +4,11 @@ the Empty-Slots Method and Rate Monotonic Scheduling"
 """
 
 import os
-import math
+import random
 import sys
 import networkx as nx
 import itertools
 from argparse import ArgumentParser
-import random
 from fileutils import get_rts_from_xmlfile, get_rts_from_pot_file
 from rtsutils import verify_with_empty_slot, last_starting_time, communication_delay
 from tabulate import tabulate
@@ -118,7 +117,7 @@ def heuristic(rts, cpus):
 
             for cpu in cpu_stack:
                 cpu["uf"] = sum([task["uf"] for task in cpu["tasks"]])
-            cpu_stack.sort(key=lambda cpu: cpu["uf"])
+            cpu_stack.sort(key=lambda cpu: (cpu["uf"], random.choice([-1,1])))
 
             for task in task_stack:
                 for cpu in cpu_stack:
@@ -272,8 +271,6 @@ def heuristic(rts, cpus):
     # Get a initial random cpu stack
     cpu_keys = list(cpus.keys())
     random.shuffle(cpu_keys)
-
-    cpu_keys = [5, 3, 2, 0, 4, 1]
 
     # 1 Mb/s network -> 125 Bytes/ms
     comm_delay = communication_delay(rts, 125)
