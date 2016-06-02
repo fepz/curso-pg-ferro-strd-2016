@@ -211,7 +211,7 @@ def heuristic(rts, cpus):
         """ The schedulability of each processor containing sending tasks is reverified with deadlines corrected
         according to the precedence constraints """
 
-        def update_deadline(graph, node):
+        def update_deadline(node):
             for cpu in cpu_stack:
                 for task in cpu["tasks"]:
                     if task["id"] == node and "new_d" not in task:
@@ -242,7 +242,7 @@ def heuristic(rts, cpus):
             predecessors = graph.predecessors(node)
             if predecessors:
                 for predecessor in predecessors:
-                    update_deadline(graph, predecessor)
+                    update_deadline(predecessor)
                     recursive(graph, predecessor)
 
         delta = communication_delay
@@ -254,6 +254,12 @@ def heuristic(rts, cpus):
 
         # check that each cpu is schedulable and the memory constraints are held
         for cpu, cpu_data in cpus.items():
+            # verify that the corrected deadlines are greater than zero
+            for t in cpu_data["tasks"]:
+                if "new_d" in t:
+                    if t["new_d"] <= 0:
+                        return False
+
             if not allocation_test(cpu_data["capacity"], cpu_data["tasks"]):
                 return False
 
@@ -273,7 +279,7 @@ def heuristic(rts, cpus):
     random.shuffle(cpu_keys)
 
     # 1 Mb/s network -> 125 Bytes/ms
-    comm_delay = communication_delay(rts, 125)
+    comm_delay = communication_delay(rts, 500)
 
     for cpu_stack_perm_t in itertools.permutations(cpu_keys):
         # Clear any previous task allocations
