@@ -72,7 +72,7 @@ def last_starting_time(task, tasks):
 
     t = 1
     while True:
-        t_tmp = n - c + 1 + get_workload(t, tasks)  # << --- removed +1
+        t_tmp = n - c + 1 + get_workload(t, tasks)
         if t_tmp == t:
             break
         t = t_tmp
